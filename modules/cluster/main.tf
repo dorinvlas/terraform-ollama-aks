@@ -26,19 +26,11 @@ resource "azurerm_kubernetes_cluster" "this" {
   name                = "aks-${var.name}-${var.location}"
   location            = var.location
   resource_group_name = var.resource_group_name
-  node_resource_group = "${var.resource_group_name}-generated"
-  dns_prefix          = "aks-${var.name}-${var.location}"
-  kubernetes_version  = var.kubernetes_version
-
-  network_profile {
-    network_plugin = "azure"
-  }
-
   default_node_pool {
     name                        = "system"
     temporary_name_for_rotation = "systemtemp"
     node_count                  = 1
-    vm_size                     = "Standard_D2s_v5"
+    vm_size                     = "Standard_B16as_v2"
     vnet_subnet_id              = var.subnet_id
     orchestrator_version        = var.kubernetes_version
 
@@ -60,7 +52,7 @@ resource "azurerm_kubernetes_cluster" "this" {
 resource "azurerm_kubernetes_cluster_node_pool" "this" {
   name                  = "gpu"
   kubernetes_cluster_id = azurerm_kubernetes_cluster.this.id
-  vm_size               = "Standard_NC6s_v3"
+  vm_size               = "Standard_NC4as_T4_v3"
   node_count            = 1
   vnet_subnet_id        = var.subnet_id
 
@@ -69,6 +61,24 @@ resource "azurerm_kubernetes_cluster_node_pool" "this" {
   }
 
   node_taints = ["sku=gpu:NoSchedule"]
+}
+
+resource "azurerm_kubernetes_cluster_node_pool" "gpu_spot" {
+  name                  = "gpu-spot"
+  kubernetes_cluster_id = azurerm_kubernetes_cluster.this.id
+  vm_size               = "Standard_NC6s_v3"
+  node_count            = 0
+  vnet_subnet_id        = var.subnet_id
+  enable_auto_scaling   = true
+  max_count             = 5
+  min_count             = 0
+  priority              = "Spot"
+
+  node_labels = {
+    "nvidia.com/gpu.present" = "true"
+  }
+
+  node_taints = ["sku=gpu-spot:NoSchedule"]
 }
 
 resource "azurerm_role_assignment" "this" {
